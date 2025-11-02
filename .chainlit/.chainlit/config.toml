@@ -1,0 +1,58 @@
+[project]
+# Whether to enable telemetry (default: true). No personal data is collected.
+enable_telemetry = false
+
+# List of environment variables to be provided by each user to use the app.
+user_env = []
+
+# Duration (in seconds) during which the session is saved when the connection is lost
+session_timeout = 3600
+
+[UI]
+# Name of the app and chatbot.
+name = "RAG Agent System"
+
+# Show the prompt playground.
+show_prompt_playground = true
+
+# Description of the app and chatbot. This is used for HTML tags.
+description = "A powerful RAG system with intelligent routing"
+
+# Large size content are by default collapsed for a cleaner ui
+default_collapse_content = true
+
+# The default value for the expand messages settings.
+default_expand_messages = false
+
+# Hide the chain of thought details from the user in the UI.
+hide_cot = false
+
+# Link to your github repo. This will add a github button in the UI's header.
+# github = "https://github.com/your-repo"
+
+# Specify a CSS file that can be used to customize the user interface.
+# The CSS file can be served from the public directory or via an external link.
+custom_css = "/.chainlit/custom.css"
+
+# Specify a Javascript file that can be used to customize the user interface.
+# The Javascript file can be served from the public directory or via an external link.
+custom_js = "/.chainlit/custom.js"
+
+# Specify a custom font url.
+custom_font = "https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@300;400;500;600;700&display=swap"
+
+# Specify a custom build directory. This directory should contain a built version of your frontend.
+# build_dir = "./build"
+
+# Override default MUI light theme. (Check theme.ts)
+[UI.theme.light]
+background = "#F7F9FC"
+paper = "#FFFFFF"
+
+# Override default MUI dark theme. (Check theme.ts)
+# [UI.theme.dark]
+# background = "#2D2D2D"
+# paper = "#1E1E1E"
+
+[meta]
+generated_by = "1.0.0"

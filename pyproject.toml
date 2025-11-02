@@ -1,0 +1,14 @@
+[project]
+name = "hcmut-nqpn"
+version = "0.1.0"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "neo4j>=6.0.2",
+    "openai>=2.6.1",
+    "openai-agents>=0.4.2",
+    "pydantic>=2.12.3",
+    "pymilvus>=2.6.3",
+]
+
+
+
