@@ -90,6 +90,115 @@ from tools.context_builder_tool import ContextBuilderTool, BuildKBContextInput, 
 
 logger = logging.getLogger(__name__)
 
+# Global tool instances (initialized on first use)
+_milvus_tool_ba: Optional[MilvusSearchTool] = None
+_neo4j_tool_ba: Optional[Neo4jSearchTool] = None
+
+
+def _get_milvus_tool_ba() -> MilvusSearchTool:
+    """Get or create Milvus search tool instance for Business Analysis Agent."""
+    global _milvus_tool_ba
+    if _milvus_tool_ba is None:
+        _milvus_tool_ba = MilvusSearchTool()
+    return _milvus_tool_ba
+
+
+def _get_neo4j_tool_ba() -> Neo4jSearchTool:
+    """Get or create Neo4j search tool instance for Business Analysis Agent."""
+    global _neo4j_tool_ba
+    if _neo4j_tool_ba is None:
+        _neo4j_tool_ba = Neo4jSearchTool()
+    return _neo4j_tool_ba
+
+
+@function_tool
+def search_milvus_kb_ba(query: str, top_k: int = 15) -> str:
+    """Search the Knowledge Base (Milvus) for relevant document chunks based on semantic similarity.
+    
+    This tool is used by Business Analysis Agent to find similar requirements and documents
+    that can help in analyzing conflicts, contradictions, and suggesting improvements.
+    
+    Args:
+        query: The search query or question text
+        top_k: Number of top results to return (default: 15, max: 50)
+        
+    Returns:
+        A formatted string containing document IDs and summaries of the search results
+    """
+    try:
+        milvus_tool = _get_milvus_tool_ba()
+        input_data = MilvusSearchInput(query=query, top_k=top_k)
+        output = milvus_tool.search(input_data)
+        
+        if not output.doc_ids:
+            return "No relevant documents found in Knowledge Base."
+        
+        result_parts = [f"Found {len(output.doc_ids)} relevant documents:"]
+        for i, doc_id in enumerate(output.doc_ids, 1):
+            result_parts.append(f"{i}. {doc_id}")
+        
+        # Add summaries if available
+        if output.results:
+            result_parts.append("\nDocument summaries:")
+            for i, result in enumerate(output.results[:5], 1):  # Limit to top 5 summaries
+                doc_id = result.get("id", "Unknown")
+                preview = result.get("text_preview", "")[:200]  # Truncate to 200 chars
+                if preview:
+                    result_parts.append(f"{i}. {doc_id}: {preview}...")
+        
+        return "\n".join(result_parts)
+    except Exception as e:
+        logger.error(f"Error in search_milvus_kb_ba tool: {e}", exc_info=True)
+        return f"Error searching Knowledge Base: {str(e)}"
+
+
+@function_tool
+def search_neo4j_kg_ba(query: str, top_k: int = 15) -> str:
+    """Search the Knowledge Graph (Neo4j) for relevant Project, Requirement, UserStory, Meeting, Participant, and Event nodes.
+    
+    This tool is used by Business Analysis Agent to find related requirements, projects, and user stories
+    that can help in analyzing conflicts, contradictions, and suggesting improvements.
+    
+    Args:
+        query: The search query or question text
+        top_k: Number of top results to return (default: 15, max: 50)
+        
+    Returns:
+        A formatted string containing node identifiers and summaries of the search results
+    """
+    try:
+        neo4j_tool = _get_neo4j_tool_ba()
+        input_data = Neo4jSearchInput(query=query, top_k=top_k)
+        output = neo4j_tool.search(input_data)
+        
+        if not output.identifiers:
+            return "No relevant nodes found in Knowledge Graph."
+        
+        result_parts = [f"Found {len(output.identifiers)} relevant nodes:"]
+        for i, identifier in enumerate(output.identifiers, 1):
+            result_parts.append(f"{i}. {identifier}")
+        
+        # Add node details if available
+        if output.results:
+            result_parts.append("\nNode details:")
+            for i, result in enumerate(output.results[:5], 1):  # Limit to top 5 details
+                identifier = result.get("identifier", "Unknown")
+                labels = result.get("labels", [])
+                props = result.get("properties", {})
+                
+                # Extract key info
+                name = props.get("name") or props.get("title", "N/A")
+                description = props.get("description", "")[:150]  # Truncate to 150 chars
+                
+                result_parts.append(f"{i}. {identifier} ({', '.join(labels)}): {name}")
+                if description:
+                    result_parts.append(f"   Description: {description}...")
+        
+        return "\n".join(result_parts)
+    except Exception as e:
+        logger.error(f"Error in search_neo4j_kg_ba tool: {e}", exc_info=True)
+        return f"Error searching Knowledge Graph: {str(e)}"
+
 
 @dataclass
 class BAAnalysisResult:
@@ -534,12 +643,17 @@ def create_business_analysis_agent(
             "4. Identify missing requirements based on similar projects\n"
             "5. Provide recommendations for requirements engineering best practices\n\n"
             "When analyzing requirements:\n"
+            "- ALWAYS call search_milvus_kb_ba(query) to search the Knowledge Base for similar requirements\n"
+            "- ALWAYS call search_neo4j_kg_ba(query) to search the Knowledge Graph for related projects, requirements, and user stories\n"
             "- Use the analyze_requirements tool to perform comprehensive analysis\n"
             "- Provide at least one requirement text (user_text_1, user_text_2, or user_text_3)\n"
-            "- The tool will automatically query Knowledge Base (Milvus) and Knowledge Graph (Neo4j) for context\n"
+            "- The analyze_requirements tool will also automatically query Knowledge Base (Milvus) and Knowledge Graph (Neo4j) for context\n"
+            "- You can use search_milvus_kb_ba and search_neo4j_kg_ba tools directly to get more detailed search results\n"
             "- Return structured analysis results in JSON format with BA_answer_text, KB, and KG\n"
             "- The analysis includes: requirements summary, issues identified, contradictions, "
-            "quality assessment, improvement suggestions, missing requirements, and recommendations"
+            "quality assessment, improvement suggestions, missing requirements, and recommendations\n\n"
+            "CRITICAL: You MUST call search_milvus_kb_ba and search_neo4j_kg_ba BEFORE using analyze_requirements tool "
+            "to get the most relevant context from the Knowledge Base and Knowledge Graph."
         )
     
     # Create model settings
@@ -552,13 +666,13 @@ def create_business_analysis_agent(
     
     model_settings = ModelSettings(**model_settings_kwargs)
     
-    # Create agent with analysis tool
+    # Create agent with analysis tools (analyze_requirements, search_milvus_kb_ba, search_neo4j_kg_ba)
     agent = Agent(
         name=name,
         instructions=instructions,
         model=model,
         model_settings=model_settings,
-        tools=[analyze_requirements],
+        tools=[analyze_requirements, search_milvus_kb_ba, search_neo4j_kg_ba],
     )
     
     return agent

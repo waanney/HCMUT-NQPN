@@ -102,15 +102,79 @@ from src.agents.suggestion_models import (
     validate_ba_input_json,
     suggestion_output_to_json,
 )
-from src.agents.tools.web_search_tool import WebSearchTool, get_default_search_tool
-from src.core.prompt.prompt_templates import (
-    SUGGESTION_AGENT_SYSTEM_PROMPT,
-    SUGGESTION_AGENT_USER_PROMPT_TEMPLATE,
-    WEB_SEARCH_QUERY_GENERATION_PROMPT,
-)
-from src.core.config import load_config
+from tools.web_search_tool import WebSearchTool, get_default_search_tool
+from string import Template
 
 logger = logging.getLogger(__name__)
+
+# Prompt templates for Suggestion Agent
+WEB_SEARCH_QUERY_GENERATION_PROMPT = Template("""
+You are a search query generator for requirements engineering.
+
+Given a conflict description and related requirements, generate 3-5 search queries that would help find solutions or best practices.
+
+**Conflict Description:**
+${conflict_description}
+
+**Related Requirements:**
+${requirements}
+
+Generate a JSON object with the following format:
+{
+    "queries": ["query1", "query2", "query3", ...]
+}
+
+The queries should be:
+- Specific to the conflict described
+- Focused on finding solutions or best practices
+- Clear and actionable
+- In English
+
+Respond with ONLY the JSON object, no additional text.
+""")
+
+SUGGESTION_AGENT_SYSTEM_PROMPT = """You are a Suggestion Agent specializing in Requirements Engineering.
+
+Your role is to:
+1. Analyze conflicts and issues detected by the Business Analysis Agent
+2. Use web search results and knowledge base/graph references to find solutions
+3. Generate detailed, actionable suggestions to resolve conflicts
+4. Provide comprehensive solutions following software engineering best practices
+
+**Guidelines:**
+- Be specific and actionable in your suggestions
+- Reference industry best practices when applicable
+- Consider multiple perspectives and approaches
+- Prioritize solutions that address the root cause of conflicts
+- Provide clear, step-by-step recommendations when possible
+- Reference relevant knowledge base documents and knowledge graph nodes when available
+"""
+
+SUGGESTION_AGENT_USER_PROMPT_TEMPLATE = Template("""
+**Business Analysis Result:**
+${ba_answer_text}
+
+**Knowledge Base Context:**
+${kb_context}
+
+**Knowledge Graph Context:**
+${kg_context}
+
+**Web Search Results:**
+${web_search_results}
+
+**Your Task:**
+Based on the above information, generate detailed suggestions to resolve the identified conflicts and improve the requirements.
+
+Your suggestions should:
+1. Address each conflict or issue identified
+2. Provide specific, actionable recommendations
+3. Reference industry best practices from web search results when applicable
+4. Consider the context from knowledge base and knowledge graph
+5. Be clear, concise, and implementable
+
+Generate your response below:
+""")
 
 
 class SuggestionAgent:
@@ -141,8 +205,10 @@ class SuggestionAgent:
         """
         # Load config nếu không có API key
         if openai_api_key is None:
-            config = load_config()
-            openai_api_key = config.openai.api_key
+            import os
+            openai_api_key = os.getenv("OPENAI_API_KEY")
+            if not openai_api_key:
+                raise ValueError("OPENAI_API_KEY not found in environment variables")
         
         self.openai_client = OpenAI(api_key=openai_api_key)
         self.model = model
@@ -152,7 +218,8 @@ class SuggestionAgent:
         
         # Initialize web search tool nếu enabled
         if self.web_search_enabled:
-            self.web_search_tool = get_default_search_tool(openai_api_key=openai_api_key)
+            # get_default_search_tool doesn't take openai_api_key, it uses env var
+            self.web_search_tool = get_default_search_tool()
         else:
             self.web_search_tool = None
         
@@ -483,13 +550,16 @@ def _get_suggestion_agent_instance() -> SuggestionAgent:
     """Get or create the suggestion agent instance"""
     global _suggestion_agent_instance
     if _suggestion_agent_instance is None:
-        config = load_config()
+        import os
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY not found in environment variables")
         _suggestion_agent_instance = SuggestionAgent(
-            openai_api_key=config.openai.api_key,
-            model=config.openai.model,
-            temperature=config.openai.temperature,
-            web_search_enabled=config.web_search.enabled,
-            max_web_results=config.web_search.max_results,
+            openai_api_key=api_key,
+            model="gpt-4o",  # Default model
+            temperature=0.7,  # Default temperature
+            web_search_enabled=True,  # Default enabled
+            max_web_results=3,  # Default max results
         )
     return _suggestion_agent_instance
 
@@ -628,14 +698,17 @@ def create_default_agent() -> SuggestionAgent:
     Returns:
         Configured SuggestionAgent instance
     """
-    config = load_config()
+    import os
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not found in environment variables")
     
     return SuggestionAgent(
-        openai_api_key=config.openai.api_key,
-        model=config.openai.model,
-        temperature=config.openai.temperature,
-        web_search_enabled=config.web_search.enabled,
-        max_web_results=config.web_search.max_results,
+        openai_api_key=api_key,
+        model="gpt-4o",  # Default model
+        temperature=0.7,  # Default temperature
+        web_search_enabled=True,  # Default enabled
+        max_web_results=3,  # Default max results
     )
 
 

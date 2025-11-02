@@ -823,99 +823,117 @@ class IngestAgent:
             # Create meetings (use merge to avoid duplicates)
             meeting_id_mapping = {}  # Map original meeting_id to merged_id
             if neo4j_data.get("meetings"):
+                logger.info(f"Processing {len(neo4j_data['meetings'])} meetings")
                 for meeting_data in neo4j_data["meetings"]:
-                    meeting = Meeting(
-                        meeting_id=meeting_data.get("meeting_id", ""),
-                        title=meeting_data.get("title", ""),
-                        description=meeting_data.get("description"),
-                        date=meeting_data.get("date"),
-                        start_time=meeting_data.get("start_time"),
-                        end_time=meeting_data.get("end_time"),
-                        location=meeting_data.get("location"),
-                        meeting_type=meeting_data.get("meeting_type", "general"),
-                        meeting_status=meeting_data.get("meeting_status", "completed"),
-                        agenda=meeting_data.get("agenda", []),
-                        action_items=meeting_data.get("action_items", []),
-                        decisions=meeting_data.get("decisions", []),
-                        next_meeting_date=meeting_data.get("next_meeting_date"),
-                        next_meeting_time=meeting_data.get("next_meeting_time"),
-                        project_id=meeting_data.get("project_id"),
-                        created_date=meeting_data.get("created_date"),
-                        updated_date=meeting_data.get("updated_date"),
-                    )
-                    # Use merge to avoid duplicates based on title and date
-                    merged_id = client.merge_meeting_by_title_date(meeting)
-                    if merged_id:
-                        meetings_count += 1
-                        original_meeting_id = meeting.meeting_id
-                        meeting_id_mapping[original_meeting_id] = merged_id
-                        logger.debug(f"Created/merged meeting: {merged_id}")
-                        
-                        # Link participants to meeting (use merged_id)
-                        for original_participant_id, merged_participant_id in participant_id_mapping.items():
-                            try:
-                                client.link_participant_to_meeting(merged_participant_id, merged_id)
-                            except Exception as e:
-                                logger.warning(f"Could not link participant {merged_participant_id} to meeting {merged_id}: {e}")
+                    try:
+                        meeting = Meeting(
+                            meeting_id=meeting_data.get("meeting_id", ""),
+                            title=meeting_data.get("title", ""),
+                            description=meeting_data.get("description"),
+                            date=meeting_data.get("date"),
+                            start_time=meeting_data.get("start_time"),
+                            end_time=meeting_data.get("end_time"),
+                            location=meeting_data.get("location"),
+                            meeting_type=meeting_data.get("meeting_type", "general"),
+                            meeting_status=meeting_data.get("meeting_status", "completed"),
+                            agenda=meeting_data.get("agenda", []),
+                            action_items=meeting_data.get("action_items", []),
+                            decisions=meeting_data.get("decisions", []),
+                            next_meeting_date=meeting_data.get("next_meeting_date"),
+                            next_meeting_time=meeting_data.get("next_meeting_time"),
+                            project_id=meeting_data.get("project_id"),
+                            created_date=meeting_data.get("created_date"),
+                            updated_date=meeting_data.get("updated_date"),
+                        )
+                        # Use merge to avoid duplicates based on title and date
+                        merged_id = client.merge_meeting_by_title_date(meeting)
+                        if merged_id:
+                            meetings_count += 1
+                            original_meeting_id = meeting.meeting_id
+                            meeting_id_mapping[original_meeting_id] = merged_id
+                            logger.info(f"Created/merged meeting: {merged_id} (title: {meeting.title})")
+                            
+                            # Link all participants from the same meeting minutes to this meeting
+                            # All participants in the JSON are from the same meeting, so link them all
+                            linked_count = 0
+                            for original_participant_id, merged_participant_id in participant_id_mapping.items():
+                                try:
+                                    client.link_participant_to_meeting(merged_participant_id, merged_id)
+                                    linked_count += 1
+                                    logger.debug(f"Linked participant {merged_participant_id} to meeting {merged_id}")
+                                except Exception as e:
+                                    logger.warning(f"Could not link participant {merged_participant_id} to meeting {merged_id}: {e}")
+                            logger.info(f"Linked {linked_count} participants to meeting {merged_id}")
+                        else:
+                            logger.warning(f"Failed to create/merge meeting: {meeting.meeting_id}")
+                    except Exception as e:
+                        logger.error(f"Error processing meeting {meeting_data.get('meeting_id', 'unknown')}: {e}", exc_info=True)
             
             # Create events (use merge to avoid duplicates)
             if neo4j_data.get("events"):
+                logger.info(f"Processing {len(neo4j_data['events'])} events")
                 for event_data in neo4j_data["events"]:
-                    # Convert priority string to Priority enum
-                    priority_str = event_data.get("priority", "medium")
-                    if isinstance(priority_str, str):
-                        priority = Priority(priority_str) if priority_str in [e.value for e in Priority] else Priority.MEDIUM
-                    else:
-                        priority = Priority.MEDIUM
-                    
-                    # Get merged meeting_id if original meeting_id exists
-                    original_meeting_id = event_data.get("meeting_id")
-                    merged_meeting_id = meeting_id_mapping.get(original_meeting_id, original_meeting_id) if original_meeting_id else None
-                    
-                    event = Event(
-                        event_id=event_data.get("event_id", ""),
-                        name=event_data.get("name", ""),
-                        description=event_data.get("description"),
-                        event_type=event_data.get("event_type", "discussion"),
-                        date=event_data.get("date"),
-                        time=event_data.get("time"),
-                        priority=priority,
-                        status=event_data.get("status", "open"),
-                        assigned_to=event_data.get("assigned_to"),
-                        due_date=event_data.get("due_date"),
-                        meeting_id=merged_meeting_id,  # Use merged meeting_id
-                        related_entity_ids=event_data.get("related_entity_ids", []),
-                    )
-                    # Use merge to avoid duplicates based on name, date, and meeting_id
-                    merged_id = client.merge_event_by_name_date_meeting(event)
-                    if merged_id:
-                        events_count += 1
-                        logger.debug(f"Created/merged event: {merged_id}")
-                    
-                    # Link event to participant if assigned_to is provided
-                    # Use merged_id from merge operation
-                    if merged_id and event.assigned_to:
-                        # Try to find participant by name or ID in participant_id_mapping
-                        merged_participant_id = None
-                        for original_participant_id, mapped_id in participant_id_mapping.items():
-                            # Find by matching name or original participant_id
-                            participant_data = next(
-                                (p for p in neo4j_data.get("participants", []) 
-                                 if p.get("participant_id") == original_participant_id),
-                                None
-                            )
-                            if participant_data:
-                                if (participant_data.get("name") == event.assigned_to or 
-                                    participant_data.get("participant_id") == event.assigned_to or
-                                    original_participant_id == event.assigned_to):
-                                    merged_participant_id = mapped_id
-                                    break
+                    try:
+                        # Convert priority string to Priority enum
+                        priority_str = event_data.get("priority", "medium")
+                        if isinstance(priority_str, str):
+                            priority = Priority(priority_str) if priority_str in [e.value for e in Priority] else Priority.MEDIUM
+                        else:
+                            priority = Priority.MEDIUM
                         
-                        if merged_participant_id:
-                            try:
-                                client.link_event_to_participant(merged_id, merged_participant_id)
-                            except Exception as e:
-                                logger.warning(f"Could not link event {merged_id} to participant {merged_participant_id}: {e}")
+                        # Get merged meeting_id if original meeting_id exists
+                        original_meeting_id = event_data.get("meeting_id")
+                        merged_meeting_id = meeting_id_mapping.get(original_meeting_id, original_meeting_id) if original_meeting_id else None
+                        
+                        event = Event(
+                            event_id=event_data.get("event_id", ""),
+                            name=event_data.get("name", ""),
+                            description=event_data.get("description"),
+                            event_type=event_data.get("event_type", "discussion"),
+                            date=event_data.get("date"),
+                            time=event_data.get("time"),
+                            priority=priority,
+                            status=event_data.get("status", "open"),
+                            assigned_to=event_data.get("assigned_to"),
+                            due_date=event_data.get("due_date"),
+                            meeting_id=merged_meeting_id,  # Use merged meeting_id
+                            related_entity_ids=event_data.get("related_entity_ids", []),
+                        )
+                        # Use merge to avoid duplicates based on name, date, and meeting_id
+                        merged_id = client.merge_event_by_name_date_meeting(event)
+                        if merged_id:
+                            events_count += 1
+                            logger.info(f"Created/merged event: {merged_id} (name: {event.name})")
+                            
+                            # Link event to participant if assigned_to is provided
+                            # Use merged_id from merge operation
+                            if event.assigned_to:
+                                # Try to find participant by name or ID in participant_id_mapping
+                                merged_participant_id = None
+                                for original_participant_id, mapped_id in participant_id_mapping.items():
+                                    # Find by matching name or original participant_id
+                                    participant_data = next(
+                                        (p for p in neo4j_data.get("participants", []) 
+                                         if p.get("participant_id") == original_participant_id),
+                                        None
+                                    )
+                                    if participant_data:
+                                        if (participant_data.get("name") == event.assigned_to or 
+                                            participant_data.get("participant_id") == event.assigned_to or
+                                            original_participant_id == event.assigned_to):
+                                            merged_participant_id = mapped_id
+                                            break
+                                
+                                if merged_participant_id:
+                                    try:
+                                        client.link_event_to_participant(merged_id, merged_participant_id)
+                                        logger.debug(f"Linked event {merged_id} to participant {merged_participant_id}")
+                                    except Exception as e:
+                                        logger.warning(f"Could not link event {merged_id} to participant {merged_participant_id}: {e}")
+                        else:
+                            logger.warning(f"Failed to create/merge event: {event.event_id}")
+                    except Exception as e:
+                        logger.error(f"Error processing event {event_data.get('event_id', 'unknown')}: {e}", exc_info=True)
             
             # Close connection
             client.close()
@@ -925,8 +943,12 @@ class IngestAgent:
             return f"Successfully fed Neo4j from JSON: {projects_count} projects, {requirements_count} requirements, {user_stories_count} user stories, {meetings_count} meetings, {participants_count} participants, {events_count} events (total: {total_count} nodes)"
             
         except Exception as e:
-            logger.error(f"Error feeding Neo4j from JSON: {e}", exc_info=True)
-            return f"Error feeding Neo4j from JSON: {str(e)}"
+            error_msg = str(e)
+            logger.error(f"Error feeding Neo4j from JSON: {error_msg}", exc_info=True)
+            # Log more details about the error
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return f"Error feeding Neo4j from JSON: {error_msg}"
     
     def chunk_text(self, text: str, chunk_size: int = 500, chunk_overlap: int = 50, use_semantic: bool = True) -> List[str]:
         """Chunk text into smaller pieces using semantic chunking.
@@ -1367,9 +1389,17 @@ class IngestAgent:
             prompt = f"""Bạn là trợ lý AI để trích xuất thông tin từ biên bản họp.
 
 Hãy phân tích văn bản sau và trích xuất thông tin về:
-1. **Cuộc họp**: Tiêu đề, ngày giờ (date, start_time, end_time), địa điểm (location), loại họp (meeting_type), trạng thái (meeting_status), agenda, action_items, decisions, next_meeting_date, next_meeting_time, project_id
-2. **Người tham dự**: Tên (name), vai trò (role), email (nếu có), trạng thái tham dự (attendance_status: present/absent/late/excused), ghi chú (notes)
-3. **Sự kiện**: Tên (name), mô tả (description), loại (event_type: discussion/decision/action_item/deadline/milestone), ngày giờ (date, time), độ ưu tiên (priority: critical/high/medium/low), trạng thái (status: open/in_progress/completed/cancelled), người được giao (assigned_to), deadline (due_date)
+1. **Cuộc họp**: Tiêu đề, ngày giờ (date, start_time, end_time), địa điểm (location), loại họp (meeting_type), trạng thái (meeting_status), agenda, action_items, decisions, next_meeting_date, next_meeting_time, project_id, tone (heated/collaborative/neutral/tense/positive), objective
+2. **Người tham dự**: Tên (name), vai trò (role) - extract từ format "Name – Role" hoặc "Name – Role", email (nếu có), trạng thái tham dự (attendance_status: present/absent/late/excused), ghi chú (notes)
+3. **Sự kiện**: Tên (name), mô tả (description), loại (event_type: discussion/decision/action_item/deadline/milestone/conflict), ngày giờ (date, time), độ ưu tiên (priority: critical/high/medium/low), trạng thái (status: open/in_progress/completed/cancelled), người được giao (assigned_to - tên người), deadline (due_date), meeting_id
+
+**Lưu ý đặc biệt:**
+- Parse ngày từ format: "November 15, 2025" -> "2025-11-15", "Nov 15, 2025" -> "2025-11-15"
+- Parse thời gian từ format: "16:00 – 17:00" -> start_time: "16:00", end_time: "17:00"
+- Extract conflicts: Nếu có conflicts/arguments, tạo events với event_type="conflict" và mô tả conflict resolution
+- Extract action items: Nếu có format "Name – Action" hoặc "Action by Name", tạo event với event_type="action_item" và assigned_to là tên người
+- Extract tone: Nếu có mention "heated", "collaborative", "tense", etc., ghi lại trong description hoặc tạo field tone
+- Parse participants từ section "Attendees:" hoặc danh sách có bullet points
 
 Trả về JSON với format:
 {{
@@ -1377,12 +1407,12 @@ Trả về JSON với format:
     {{
       "meeting_id": "MEET-<random_id>",
       "title": "...",
-      "description": "...",
+      "description": "... (include objective, tone, key discussions)",
       "date": "YYYY-MM-DD",
       "start_time": "HH:MM",
       "end_time": "HH:MM",
       "location": "...",
-      "meeting_type": "general|kickoff|review|planning|retrospective",
+      "meeting_type": "general|kickoff|review|planning|retrospective|deployment|testing",
       "meeting_status": "completed",
       "agenda": ["..."],
       "action_items": ["..."],
@@ -1407,7 +1437,7 @@ Trả về JSON với format:
       "event_id": "EVENT-<random_id>",
       "name": "...",
       "description": "...",
-      "event_type": "discussion|decision|action_item|deadline|milestone",
+      "event_type": "discussion|decision|action_item|deadline|milestone|conflict",
       "date": "YYYY-MM-DD",
       "time": "HH:MM",
       "priority": "critical|high|medium|low",
@@ -1419,12 +1449,12 @@ Trả về JSON với format:
   ]
 }}
 
-**Lưu ý:**
-- Nếu không tìm thấy thông tin, trả về mảng rỗng []
-- Đảm bảo tất cả ID là unique
-- Parse ngày giờ từ văn bản và chuyển sang format ISO (YYYY-MM-DD) và HH:MM
-- Nếu có project name, tạo project_id dạng "PROJ-<hash>"
-- Liên kết participants và events với meeting_id tương ứng
+**Ví dụ parsing:**
+- "Date: November 15, 2025" -> date: "2025-11-15"
+- "Time: 16:00 – 17:00" -> start_time: "16:00", end_time: "17:00"
+- "Liam Tran – Frontend Lead" -> name: "Liam Tran", role: "Frontend Lead"
+- "Huy – Publish schema versioning API by Nov 17, 2025" -> event with assigned_to: "Huy", due_date: "2025-11-17"
+- "Conflict Identified: synchronization and ownership conflict" -> event with event_type: "conflict"
 
 Văn bản cần phân tích:
 {text[:8000]}
@@ -1483,6 +1513,9 @@ Trả về CHỈ JSON, không có text thêm."""
                         event["priority"] = "medium"
                     if "status" not in event:
                         event["status"] = "open"
+                    # Ensure meeting_id is linked if missing
+                    if "meeting_id" not in event and meetings:
+                        event["meeting_id"] = meetings[0].get("meeting_id")
                 
                 logger.info(f"Extracted {len(meetings)} meetings, {len(participants)} participants, {len(events)} events")
                 

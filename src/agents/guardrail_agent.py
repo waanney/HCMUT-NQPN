@@ -835,22 +835,22 @@ if __name__ == "__main__":
         agent = create_guardrail_agent()
         
         print("Testing Guardrail Agent with Runner...")
-    print("="*60)
-    
-    # Test 1: From Suggestion_Agent with trusted source (with user_input)
+        print("="*60)
+        
+        # Test 1: From Suggestion_Agent with trusted source (with user_input)
         test1_input = (
             "Evaluate this content: "
             "user_input='How should I implement user authentication?', "
             "answer_text='The user authentication requirement should include multi-factor authentication for enhanced security.', "
             "source='https://www.nist.gov/publications/digital-identity-guidelines'"
         )
-    
-    print("\n📝 Test 1: Suggestion_Agent with trusted source (includes user_input)")
+        
+        print("\n📝 Test 1: Suggestion_Agent with trusted source (includes user_input)")
         print("Input:", test1_input)
         result1 = await Runner.run(agent, test1_input)
         print("Output:", result1.final_output)
-    
-    # Test 2: From RAG_Agent with no source (with user_input)
+        
+        # Test 2: From RAG_Agent with no source (with user_input)
         test2_input = (
             "Evaluate this content: "
             "user_input='What conflicts exist between REQ-001 and REQ-002?', "
@@ -858,53 +858,53 @@ if __name__ == "__main__":
             "kb='doc_014,doc_015', "
             "kg='REQ-001,REQ-002'"
         )
-    
-    print("\n📝 Test 2: RAG_Agent with no source (includes user_input)")
+        
+        print("\n📝 Test 2: RAG_Agent with no source (includes user_input)")
         print("Input:", test2_input)
         result2 = await Runner.run(agent, test2_input)
         print("Output:", result2.final_output)
-    
-    # Test 3: Garbage text (with user_input)
+        
+        # Test 3: Garbage text (with user_input)
         test3_input = (
             "Evaluate this content: "
             "user_input='What is the best authentication method?', "
             "answer_text='asdfkjaslkdfjalksjdflkajsdlfkjaslkdfj', "
             "source='https://example.com'"
         )
-    
-    print("\n📝 Test 3: Garbage text (includes user_input)")
+        
+        print("\n📝 Test 3: Garbage text (includes user_input)")
         print("Input:", test3_input)
         result3 = await Runner.run(agent, test3_input)
         print("Output:", result3.final_output)
-    
-    # Test 4: Weak source (blog) with user_input
+        
+        # Test 4: Weak source (blog) with user_input
         test4_input = (
             "Evaluate this content: "
             "user_input='How should requirements be documented?', "
             "answer_text='Requirements should be written in clear, concise language.', "
             "source='https://medium.com/some-blog-post'"
         )
-    
-    print("\n📝 Test 4: Weak source (blog) with user_input")
+        
+        print("\n📝 Test 4: Weak source (blog) with user_input")
         print("Input:", test4_input)
         result4 = await Runner.run(agent, test4_input)
         print("Output:", result4.final_output)
-    
-    # Test 5: Backward compatibility - without user_input
+        
+        # Test 5: Backward compatibility - without user_input
         test5_input = (
             "Evaluate this content: "
             "answer_text='Project Alpha includes authentication features.', "
             "kb='doc_014', "
             "kg='PROJ-001'"
         )
-    
-    print("\n📝 Test 5: Backward compatibility - without user_input")
+        
+        print("\n📝 Test 5: Backward compatibility - without user_input")
         print("Input:", test5_input)
         result5 = await Runner.run(agent, test5_input)
         print("Output:", result5.final_output)
-    
-    print("\n" + "="*60)
-    print("✅ Guardrail Agent testing completed!")
+        
+        print("\n" + "="*60)
+        print("✅ Guardrail Agent testing completed!")
     
     # Run async test
     asyncio.run(test_guardrail_agent())

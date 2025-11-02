@@ -359,7 +359,7 @@ def search_milvus_kb(query: str, top_k: int = 15) -> str:
 
 
 @function_tool
-def search_neo4j_kg(query: str, top_k: int = 5) -> str:
+def search_neo4j_kg(query: str, top_k: int = 15) -> str:
     """Search the Knowledge Graph (Neo4j) for relevant Project, Requirement, and UserStory nodes.
     
     Args:
@@ -513,6 +513,11 @@ def create_rag_agent(
     if instructions is None:
         instructions = (
         "You are an assistant that answers questions based on a Knowledge Base (KB) and a Knowledge Graph (KG).\n\n"
+        "CRITICAL: BEFORE answering any question, you MUST:\n"
+        "1. ALWAYS call search_milvus_kb(query) to search the Knowledge Base\n"
+        "2. ALWAYS call search_neo4j_kg(query) to search the Knowledge Graph\n"
+        "3. THEN use the retrieved information to answer the question\n\n"
+        "Do NOT attempt to answer without first calling both search tools.\n\n"
         "PRIORITY RULES:\n"
         "- KB chunks are sorted by relevance (Rank #1 = most relevant)\n"
         "- Always prioritize information from chunks with higher ranking (smaller rank number = more relevant)\n\n"
@@ -534,9 +539,8 @@ def create_rag_agent(
         "6. Conclusion (1 sentence): Assess whether the answer is complete or if additional data is needed\n\n"
         "NOTES:\n"
         "- Do not fabricate any information\n"
-        "- If data is missing, clearly state “No information available”\n"
-        "- Use search_milvus_kb to find information in the Knowledge Base\n"
-        "- Use search_neo4j_kg to find information in the Knowledge Graph\n"
+        "- If data is missing, clearly state 'No information available'\n"
+        "- You MUST call search_milvus_kb and search_neo4j_kg BEFORE answering\n"
         "- Always cite the documents and nodes used from the search results"
         )
     
