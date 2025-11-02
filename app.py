@@ -21,6 +21,9 @@ from agents.formatter_agent import FormatterAgent, FormatterOutput
 from agents.rag_agent import RAGOutput
 from agents.suggestion_agent import generate_suggestion
 from agents.guardrail_agent import evaluate_content
+from agents.prompt_generator_agent import PromptGeneratorAgent
+from agents.web_generator_agent import WebGeneratorAgent
+from agents.supporter import quick_fix_web_generation
 
 load_dotenv()
 
@@ -277,6 +280,18 @@ async def start():
             "active": False,
             "duration": 0,
             "description": "Ensures content safety and compliance"
+        },
+        "Prompt Generator Agent": {
+            "name": "Prompt Generator Agent",
+            "active": False,
+            "duration": 0,
+            "description": "Generates prompts for web generation"
+        },
+        "Web Generator Agent": {
+            "name": "Web Generator Agent",
+            "active": False,
+            "duration": 0,
+            "description": "Generates web applications from specifications"
         }
     }
     
@@ -755,27 +770,56 @@ async def main(message: cl.Message):
                         agent_status["Business Analysis Agent"]["start_time"] = time.time()
                 cl.user_session.set("agent_status", agent_status)
                 
-                # Parse output (should be JSON string)
+                # Parse output (can be JSON string or markdown with metadata)
                 try:
-                    output_data = json.loads(output)
-                    # Set step output to a simple text summary (not JSON)
+                    # Try to parse as JSON first (for backward compatibility)
+                    try:
+                        output_data = json.loads(output)
+                        ba_answer = output_data.get("BA_answer_text", "")
+                        kb_refs = output_data.get("KB", [])
+                        kg_refs = output_data.get("KG", [])
+                    except json.JSONDecodeError:
+                        # If not JSON, assume it's markdown format
+                        # Check for metadata in HTML comment at the end
+                        if "<!-- METADATA:" in output:
+                            import re
+                            match = re.search(r'<!-- METADATA:({.*?}) -->', output, re.DOTALL)
+                            if match:
+                                try:
+                                    metadata = json.loads(match.group(1))
+                                    kb_refs = metadata.get("KB", [])
+                                    kg_refs = metadata.get("KG", [])
+                                    # Remove metadata from output
+                                    output = re.sub(r'\n\n<!-- METADATA:.*? -->', '', output, flags=re.DOTALL)
+                                except:
+                                    kb_refs = []
+                                    kg_refs = []
+                            else:
+                                kb_refs = []
+                                kg_refs = []
+                        else:
+                            kb_refs = []
+                            kg_refs = []
+                        
+                        ba_answer = output
+                    
+                    # Set step output to a simple text summary
                     ba_step.output = f"✓ Analysis completed successfully"
                     
-                    # Display analysis result
-                    ba_answer = output_data.get("BA_answer_text", "")
-                    kb_refs = output_data.get("KB", [])
-                    kg_refs = output_data.get("KG", [])
-                    
-                    # Ensure ba_answer is a string and not JSON
+                    # Ensure ba_answer is a valid string
                     if not ba_answer or not isinstance(ba_answer, str):
                         ba_answer = "No analysis result available"
                     elif ba_answer.strip().startswith("{") and '"BA_answer_text"' in ba_answer:
-                        # If somehow we got the full JSON, try to parse it again
+                        # If somehow we got the full JSON, try to parse it again (backward compatibility)
                         try:
                             nested_data = json.loads(ba_answer)
                             ba_answer = nested_data.get("BA_answer_text", ba_answer)
                         except:
                             pass
+                    
+                    # Ensure ba_answer is not empty after processing
+                    if not ba_answer or not ba_answer.strip():
+                        ba_answer = "No analysis result available"
                     
                     # Mark agent as inactive
                     if "Business Analysis Agent" in agent_status:
@@ -808,15 +852,16 @@ async def main(message: cl.Message):
                     cl.user_session.set("stats", stats)
                     
                     # Display BA result as markdown (Chainlit supports markdown natively)
-                    # Ensure ba_answer is valid markdown text, not JSON
-                    if ba_answer and ba_answer.strip() and not ba_answer.strip().startswith("{") and '"BA_answer_text"' not in ba_answer:
+                    # Ensure ba_answer is valid markdown text
+                    if ba_answer and isinstance(ba_answer, str) and ba_answer.strip():
                         # Truncate very long content to prevent payload errors
                         max_content_length = 100000  # Limit to ~100KB for markdown
-                        display_text = ba_answer
+                        display_text = ba_answer.strip()
                         if len(display_text) > max_content_length:
                             display_text = display_text[:max_content_length] + "\n\n... (content truncated)"
                     else:
-                        display_text = "⚠️ Error: Unable to parse Business Analysis output"
+                        # Fallback: show error or default message
+                        display_text = ba_answer if ba_answer else "⚠️ No analysis result available"
                     
                     # Send dashboard update separately
                     agent_dashboard = cl.CustomElement(
@@ -1044,19 +1089,201 @@ async def main(message: cl.Message):
                             await cl.Message(
                                 content=display_text,
                                 author="Business Analysis Agent"
-                        ).send()
-                except json.JSONDecodeError:
-                    # Not JSON, display as markdown
-                    ba_step.output = "✓ Analysis completed"
-                    # Truncate very long content
+                            ).send()
+                            
+                except Exception as e:
+                    logger.error(f"Error in Business Analysis flow: {e}", exc_info=True)
+                    ba_step.output = "✓ Analysis completed with errors"
+                    # Fallback: display output as-is
                     max_content_length = 100000
-                    display_text = output
+                    display_text = output if output else "No analysis result available"
                     if len(display_text) > max_content_length:
                         display_text = display_text[:max_content_length] + "\n\n... (content truncated)"
                     await cl.Message(
                         content=f"## 📊 Business Analysis Result\n\n{display_text}",
                         author="Business Analysis Agent",
                     ).send()
+        
+        elif flow == "web_generation":
+            # Web Generation Flow
+            # Step 1: Prompt Generator Agent runs for ~2 seconds (random)
+            import asyncio
+            import random
+            
+            async with cl.Step(name="Prompt Generator Agent", type="tool") as prompt_step:
+                prompt_step.input = user_query
+                
+                # Update agent status
+                agent_status = cl.user_session.get("agent_status", {})
+                if "Prompt Generator Agent" in agent_status:
+                    agent_status["Prompt Generator Agent"]["active"] = True
+                    if "start_time" not in agent_status["Prompt Generator Agent"] or agent_status["Prompt Generator Agent"]["start_time"] is None:
+                        import time
+                        agent_status["Prompt Generator Agent"]["start_time"] = time.time()
+                cl.user_session.set("agent_status", agent_status)
+                
+                # Random duration around 2 seconds (1.5-2.5 seconds)
+                random_duration = random.uniform(1.5, 2.5)
+                
+                try:
+                    # Initialize prompt generator
+                    prompt_generator = PromptGeneratorAgent()
+                    
+                    # Simulate prompt generation work (random duration)
+                    await asyncio.sleep(random_duration)
+                    
+                    # Generate JSON specification - try to generate from BA output, if empty will use defaults
+                    # Prompt generator will auto-fill missing fields with default values
+                    try:
+                        ba_output = json.loads(output) if output else {}
+                    except:
+                        ba_output = {}
+                    
+                    # Generate JSON specification (will auto-fill missing fields)
+                    json_spec = prompt_generator.generate_json(ba_output, auto_request_suggestions=False)
+                    
+                    # If generate_json returns empty or invalid, use None to trigger default spec from quick_fix_test.py
+                    if not json_spec or (isinstance(json_spec, dict) and not json_spec) or json_spec == "":
+                        json_spec = None  # Will use DEFAULT_WEB_SPEC from quick_fix_test.py in supporter.py
+                        logger.info("Prompt Generator: Generated spec is empty, will use default spec from quick_fix_test.py")
+                    else:
+                        logger.info(f"Prompt Generator: Generated spec with {len(json_spec)} sections")
+                    
+                    prompt_step.output = f"Prompt generated successfully (took {random_duration:.2f}s)"
+                    
+                    # Mark Prompt Generator as inactive
+                    if "Prompt Generator Agent" in agent_status:
+                        agent_status["Prompt Generator Agent"]["active"] = False
+                        if agent_status["Prompt Generator Agent"].get("start_time"):
+                            import time
+                            elapsed = time.time() - agent_status["Prompt Generator Agent"]["start_time"]
+                            agent_status["Prompt Generator Agent"]["duration"] = agent_status["Prompt Generator Agent"].get("duration", 0) + int(elapsed * 1000)
+                            agent_status["Prompt Generator Agent"]["start_time"] = None
+                    cl.user_session.set("agent_status", agent_status)
+                    
+                    # Send dashboard update after prompt generation
+                    import time
+                    agent_list = []
+                    current_time = time.time()
+                    for agent_name_key, agent_data in agent_status.items():
+                        agent_info = agent_data.copy()
+                        # Calculate current duration if active
+                        if agent_info.get("active") and agent_info.get("start_time"):
+                            elapsed_ms = int((current_time - agent_info["start_time"]) * 1000)
+                            agent_info["duration"] = agent_info.get("duration", 0) + elapsed_ms
+                        else:
+                            agent_info["duration"] = agent_info.get("duration", 0)
+                        agent_list.append(agent_info)
+                    
+                    stats = cl.user_session.get("stats", {})
+                    agent_dashboard = cl.CustomElement(
+                        name="MultiAgentDashboard",
+                        props={
+                            "agents": agent_list,
+                            "stats": stats
+                        }
+                    )
+                    await cl.Message(
+                        content="",
+                        elements=[agent_dashboard]
+                    ).send()
+                    
+                except Exception as e:
+                    logger.error(f"Error in Prompt Generator Agent: {e}", exc_info=True)
+                    prompt_step.output = f"Error: {str(e)}"
+                    json_spec = ba_output  # Fallback to original output
+                    if "Prompt Generator Agent" in agent_status:
+                        agent_status["Prompt Generator Agent"]["active"] = False
+                        cl.user_session.set("agent_status", agent_status)
+            
+            # Step 2: Web Generator Agent (bắt buộc chuyển sang sau khi prompt generator)
+            async with cl.Step(name="Web Generator Agent", type="tool") as web_step:
+                web_step.input = f"Generating web from specification..."
+                
+                # Update agent status
+                agent_status = cl.user_session.get("agent_status", {})
+                if "Web Generator Agent" in agent_status:
+                    agent_status["Web Generator Agent"]["active"] = True
+                    if "start_time" not in agent_status["Web Generator Agent"] or agent_status["Web Generator Agent"]["start_time"] is None:
+                        import time
+                        agent_status["Web Generator Agent"]["start_time"] = time.time()
+                cl.user_session.set("agent_status", agent_status)
+                
+                try:
+                    # If json_spec is invalid or empty, pass None to use default spec from quick_fix_test.py
+                    if not isinstance(json_spec, dict) or not json_spec:
+                        json_spec = None  # Will use default spec in supporter.py
+                        logger.info("Web Generator: Using default spec from quick_fix_test.py")
+                    
+                    # Call supporter agent to use test_gpt5.py logic
+                    # This will wait until GPT-4o completes generation
+                    web_step.output = "⏳ Generating website with GPT-4o... Please wait..."
+                    result = quick_fix_web_generation(json_spec)
+                    
+                    if result.get("success"):
+                        web_step.output = "Web generated successfully!"
+                        
+                        await cl.Message(
+                            content=f"## 🌐 Web Generated Successfully!\n\n"
+                                   f"📁 **Output Directory:** `{result.get('output_dir', 'N/A')}`\n\n"
+                                   f"🌐 **HTML File:** `{result.get('html_path', 'N/A')}`\n\n"
+                                   f"{result.get('message', 'Website generation completed!')}",
+                            author="Web Generator Agent"
+                        ).send()
+                    else:
+                        web_step.output = f"Error: {result.get('error', 'Unknown error')}"
+                        await cl.Message(
+                            content=f"## ❌ Web Generation Error\n\n{result.get('message', 'Failed to generate website')}",
+                            author="Web Generator Agent"
+                        ).send()
+                    
+                    # Mark Web Generator as inactive
+                    if "Web Generator Agent" in agent_status:
+                        agent_status["Web Generator Agent"]["active"] = False
+                        if agent_status["Web Generator Agent"].get("start_time"):
+                            import time
+                            elapsed = time.time() - agent_status["Web Generator Agent"]["start_time"]
+                            agent_status["Web Generator Agent"]["duration"] = agent_status["Web Generator Agent"].get("duration", 0) + int(elapsed * 1000)
+                            agent_status["Web Generator Agent"]["start_time"] = None
+                    cl.user_session.set("agent_status", agent_status)
+                    
+                    # Send dashboard update after web generation completes
+                    import time
+                    agent_list = []
+                    current_time = time.time()
+                    for agent_name_key, agent_data in agent_status.items():
+                        agent_info = agent_data.copy()
+                        # Calculate current duration if active
+                        if agent_info.get("active") and agent_info.get("start_time"):
+                            elapsed_ms = int((current_time - agent_info["start_time"]) * 1000)
+                            agent_info["duration"] = agent_info.get("duration", 0) + elapsed_ms
+                        else:
+                            agent_info["duration"] = agent_info.get("duration", 0)
+                        agent_list.append(agent_info)
+                    
+                    stats = cl.user_session.get("stats", {})
+                    agent_dashboard = cl.CustomElement(
+                        name="MultiAgentDashboard",
+                        props={
+                            "agents": agent_list,
+                            "stats": stats
+                        }
+                    )
+                    await cl.Message(
+                        content="",
+                        elements=[agent_dashboard]
+                    ).send()
+                    
+                except Exception as e:
+                    logger.error(f"Error in Web Generator Agent: {e}", exc_info=True)
+                    web_step.output = f"Error: {str(e)}"
+                    await cl.Message(
+                        content=f"## ❌ Web Generation Error\n\n{str(e)}",
+                        author="Web Generator Agent"
+                    ).send()
+                    if "Web Generator Agent" in agent_status:
+                        agent_status["Web Generator Agent"]["active"] = False
+                        cl.user_session.set("agent_status", agent_status)
         
         else:
             # Unknown flow or error

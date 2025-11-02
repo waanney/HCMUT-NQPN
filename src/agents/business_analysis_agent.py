@@ -452,16 +452,39 @@ class BusinessAnalysisAgent:
         6. Provide recommendations for requirements engineering best practices
         
         OUTPUT FORMAT:
-        Provide a comprehensive analysis in English, including:
-        - Requirements Summary
-        - Issues Identified
-        - Contradictions and Conflicts
-        - Quality Assessment (with scores)
-        - Specific Improvement Suggestions
-        - Missing Requirements
-        - Next Steps Recommendations
+        Provide your analysis in MARKDOWN format (NOT JSON), including the following sections with proper markdown headers:
         
-        Be specific, actionable, and consider modern software development practices.
+        ### Requirements Summary
+        [Your summary here]
+        
+        ### Issues Identified
+        - [Issue 1]
+        - [Issue 2]
+        
+        ### Contradictions and Conflicts
+        - [Conflict 1]
+        - [Conflict 2]
+        
+        ### Quality Assessment
+        - **Clarity**: X/10
+        - **Completeness**: X/10
+        - **Consistency**: X/10
+        - **Feasibility**: X/10
+        - **Testability**: X/10
+        
+        ### Specific Improvement Suggestions
+        1. [Suggestion 1]
+        2. [Suggestion 2]
+        
+        ### Missing Requirements
+        - [Missing requirement 1]
+        - [Missing requirement 2]
+        
+        ### Next Steps Recommendations
+        1. [Recommendation 1]
+        2. [Recommendation 2]
+        
+        IMPORTANT: Return ONLY markdown text, NOT JSON format. Use markdown headers (###) and bullet points (-) for formatting.
         """
         
         try:
@@ -472,7 +495,22 @@ class BusinessAnalysisAgent:
                 max_tokens=2000
             )
             
-            analysis_answer = response.choices[0].message.content
+            analysis_answer = response.choices[0].message.content.strip()
+            
+            # If LLM returned JSON, try to convert to markdown
+            if analysis_answer.startswith("{") or analysis_answer.startswith("["):
+                try:
+                    import json
+                    parsed = json.loads(analysis_answer)
+                    # Convert JSON structure to markdown
+                    if isinstance(parsed, dict):
+                        analysis_answer = self._json_to_markdown(parsed)
+                    else:
+                        # If it's not the expected format, use as-is
+                        pass
+                except:
+                    # If parsing fails, use original answer
+                    pass
             
             return BAAnalysisResult(
                 answer=analysis_answer,
@@ -506,6 +544,55 @@ class BusinessAnalysisAgent:
             logger.warning(f"Error building KG context: {str(e)}")
             return "No related patterns found in knowledge graph."
 
+    def _json_to_markdown(self, data: Dict[str, Any]) -> str:
+        """Convert JSON structure to markdown format"""
+        markdown = []
+        
+        if "requirements_summary" in data:
+            markdown.append("### Requirements Summary")
+            markdown.append(f"\n{data.get('requirements_summary', '')}\n")
+        
+        if "issues_identified" in data:
+            markdown.append("### Issues Identified")
+            for issue in data.get("issues_identified", []):
+                markdown.append(f"- {issue}")
+            markdown.append("")
+        
+        if "contradictions_and_conflicts" in data:
+            markdown.append("### Contradictions and Conflicts")
+            for conflict in data.get("contradictions_and_conflicts", []):
+                markdown.append(f"- {conflict}")
+            markdown.append("")
+        
+        if "quality_assessment" in data:
+            qa = data.get("quality_assessment", {})
+            markdown.append("### Quality Assessment")
+            markdown.append(f"- **Clarity**: {qa.get('clarity', 'N/A')}/10")
+            markdown.append(f"- **Completeness**: {qa.get('completeness', 'N/A')}/10")
+            markdown.append(f"- **Consistency**: {qa.get('consistency', 'N/A')}/10")
+            markdown.append(f"- **Feasibility**: {qa.get('feasibility', 'N/A')}/10")
+            markdown.append(f"- **Testability**: {qa.get('testability', 'N/A')}/10")
+            markdown.append("")
+        
+        if "specific_improvement_suggestions" in data:
+            markdown.append("### Specific Improvement Suggestions")
+            for idx, suggestion in enumerate(data.get("specific_improvement_suggestions", []), 1):
+                markdown.append(f"{idx}. {suggestion}")
+            markdown.append("")
+        
+        if "missing_requirements" in data:
+            markdown.append("### Missing Requirements")
+            for req in data.get("missing_requirements", []):
+                markdown.append(f"- {req}")
+            markdown.append("")
+        
+        if "next_steps_recommendations" in data:
+            markdown.append("### Next Steps Recommendations")
+            for idx, rec in enumerate(data.get("next_steps_recommendations", []), 1):
+                markdown.append(f"{idx}. {rec}")
+        
+        return "\n".join(markdown)
+
     def _format_output(
         self, 
         analysis_result: BAAnalysisResult, 
@@ -521,8 +608,22 @@ class BusinessAnalysisAgent:
             "KG": ["identifier1", "identifier2", ...]
         }
         """
+        # Ensure answer is markdown string, not JSON
+        answer = analysis_result.answer
+        if isinstance(answer, dict):
+            # If it's a dict, convert to markdown
+            answer = self._json_to_markdown(answer)
+        elif isinstance(answer, str) and answer.strip().startswith("{"):
+            # If it's a JSON string, try to parse and convert
+            try:
+                parsed = json.loads(answer)
+                if isinstance(parsed, dict):
+                    answer = self._json_to_markdown(parsed)
+            except:
+                pass
+        
         return {
-            "BA_answer_text": analysis_result.answer,
+            "BA_answer_text": answer if isinstance(answer, str) else str(answer),
             "KB": kb_doc_names,
             "KG": kg_identifiers
         }
@@ -563,7 +664,7 @@ def analyze_requirements(
         user_text_3: Third requirement or user story text (optional)
     
     Returns:
-        JSON string with BA_answer_text, KB (list of doc names), and KG (list of identifiers)
+        Markdown string with analysis results and metadata (KB, KG) at the end
     """
     ba_agent = _get_ba_agent_instance()
     
@@ -579,25 +680,61 @@ def analyze_requirements(
         
         # Validate that at least one text is provided
         if not user_input:
-            return json.dumps({
-                "BA_answer_text": "Error: At least one requirement text must be provided",
-                "KB": [],
-                "KG": []
-            }, ensure_ascii=False)
+            error_markdown = "## ❌ Error\n\nError: At least one requirement text must be provided"
+            return error_markdown
         
         # Perform analysis
         result = ba_agent.analyze_requirements(user_input)
         
-        # Return JSON string
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        # Extract components
+        ba_answer = result.get("BA_answer_text", "")
+        kb_refs = result.get("KB", [])
+        kg_refs = result.get("KG", [])
+        
+        # Ensure ba_answer is string (not dict/JSON)
+        if isinstance(ba_answer, dict):
+            # If it's a dict, convert to markdown
+            ba_agent = _get_ba_agent_instance()
+            ba_answer = ba_agent._json_to_markdown(ba_answer)
+        elif isinstance(ba_answer, str) and ba_answer.strip().startswith("{"):
+            # If it's a JSON string, try to parse and convert
+            try:
+                parsed = json.loads(ba_answer)
+                ba_agent = _get_ba_agent_instance()
+                ba_answer = ba_agent._json_to_markdown(parsed)
+            except:
+                pass
+        
+        # Format as markdown with metadata at the end
+        markdown_output = ba_answer if isinstance(ba_answer, str) else str(ba_answer)
+        
+        # Add references section if available
+        if kb_refs or kg_refs:
+            markdown_output += "\n\n---\n\n## 📎 References\n\n"
+            if kb_refs:
+                markdown_output += f"### 📚 Knowledge Base ({len(kb_refs)} docs)\n\n"
+                for ref in kb_refs[:10]:
+                    markdown_output += f"- `{ref}`\n"
+                markdown_output += "\n"
+            if kg_refs:
+                markdown_output += f"### 🕸️ Knowledge Graph ({len(kg_refs)} nodes)\n\n"
+                for ref in kg_refs[:10]:
+                    markdown_output += f"- `{ref}`\n"
+        
+        # Add metadata in hidden format for parsing (if needed)
+        # Format: <!-- METADATA:{"KB":[...],"KG":[...]} -->
+        if kb_refs or kg_refs:
+            metadata = {
+                "KB": kb_refs,
+                "KG": kg_refs
+            }
+            markdown_output += f"\n\n<!-- METADATA:{json.dumps(metadata)} -->"
+        
+        return markdown_output
         
     except Exception as e:
-        error_result = {
-            "BA_answer_text": f"Error: {str(e)}",
-            "KB": [],
-            "KG": []
-        }
-        return json.dumps(error_result, ensure_ascii=False)
+        error_markdown = f"## ❌ Error\n\nError: {str(e)}"
+        return error_markdown
 
 
 def create_business_analysis_agent(
@@ -649,7 +786,7 @@ def create_business_analysis_agent(
             "- Provide at least one requirement text (user_text_1, user_text_2, or user_text_3)\n"
             "- The analyze_requirements tool will also automatically query Knowledge Base (Milvus) and Knowledge Graph (Neo4j) for context\n"
             "- You can use search_milvus_kb_ba and search_neo4j_kg_ba tools directly to get more detailed search results\n"
-            "- Return structured analysis results in JSON format with BA_answer_text, KB, and KG\n"
+            "- Return structured analysis results in MARKDOWN format (NOT JSON) with sections for BA_answer_text, KB, and KG\n"
             "- The analysis includes: requirements summary, issues identified, contradictions, "
             "quality assessment, improvement suggestions, missing requirements, and recommendations\n\n"
             "CRITICAL: You MUST call search_milvus_kb_ba and search_neo4j_kg_ba BEFORE using analyze_requirements tool "
@@ -684,7 +821,7 @@ def create_business_analysis_agent_legacy():
     ba_agent_instance = BusinessAnalysisAgent()
     
     def analyze_user_requirements_legacy(user_input_json: str) -> str:
-        """Main analysis function that takes JSON input and returns JSON output"""
+        """Main analysis function that takes JSON input and returns markdown output"""
         try:
             # Parse JSON input
             user_input = json.loads(user_input_json)
@@ -696,21 +833,53 @@ def create_business_analysis_agent_legacy():
             # Perform analysis
             result = ba_agent_instance.analyze_requirements(user_input)
             
-            # Return JSON string
-            return json.dumps(result, ensure_ascii=False, indent=2)
+            # Extract components
+            ba_answer = result.get("BA_answer_text", "")
+            kb_refs = result.get("KB", [])
+            kg_refs = result.get("KG", [])
+            
+            # Ensure ba_answer is string (not dict/JSON)
+            if isinstance(ba_answer, dict):
+                # If it's a dict, convert to markdown
+                ba_answer = ba_agent_instance._json_to_markdown(ba_answer)
+            elif isinstance(ba_answer, str) and ba_answer.strip().startswith("{"):
+                # If it's a JSON string, try to parse and convert
+                try:
+                    parsed = json.loads(ba_answer)
+                    ba_answer = ba_agent_instance._json_to_markdown(parsed)
+                except:
+                    pass
+            
+            # Format as markdown
+            markdown_output = ba_answer if isinstance(ba_answer, str) else str(ba_answer)
+            
+            # Add references section if available
+            if kb_refs or kg_refs:
+                markdown_output += "\n\n---\n\n## 📎 References\n\n"
+                if kb_refs:
+                    markdown_output += f"### 📚 Knowledge Base ({len(kb_refs)} docs)\n\n"
+                    for ref in kb_refs[:10]:
+                        markdown_output += f"- `{ref}`\n"
+                    markdown_output += "\n"
+                if kg_refs:
+                    markdown_output += f"### 🕸️ Knowledge Graph ({len(kg_refs)} nodes)\n\n"
+                    for ref in kg_refs[:10]:
+                        markdown_output += f"- `{ref}`\n"
+            
+            # Add metadata in hidden format for parsing (if needed)
+            if kb_refs or kg_refs:
+                metadata = {
+                    "KB": kb_refs,
+                    "KG": kg_refs
+                }
+                markdown_output += f"\n\n<!-- METADATA:{json.dumps(metadata)} -->"
+            
+            return markdown_output
             
         except json.JSONDecodeError:
-            return json.dumps({
-                "BA_answer_text": "Error: Invalid JSON input format",
-                "KB": [],
-                "KG": []
-            }, ensure_ascii=False)
+            return "## ❌ Error\n\nError: Invalid JSON input format"
         except Exception as e:
-            return json.dumps({
-                "BA_answer_text": f"Error: {str(e)}",
-                "KB": [],
-                "KG": []
-            }, ensure_ascii=False)
+            return f"## ❌ Error\n\nError: {str(e)}"
     
     # Return the analysis function directly
     return analyze_user_requirements_legacy
@@ -726,8 +895,8 @@ if __name__ == "__main__":
         
         print("Testing Business Analysis Agent with Runner...")
         print("="*60)
-        
-        # Example input - English requirements
+    
+    # Example input - English requirements
         test_input = (
             "Analyze these requirements: "
             "user_text_1='As a customer, I want to login to the system so that I can view my purchase history', "

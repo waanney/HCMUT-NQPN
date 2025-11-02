@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NexusTech - Giải Pháp Tương Lai chuyên gia về AI và điện toán đám mây.">
+  <meta name="robots" content="index, follow">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="NexusTech - Giải Pháp Tương Lai">
+  <meta property="og:description" content="Chuyên gia về AI và điện toán đám mây.">
+  <meta property="og:url" content="https://nexustech.vn">
+  <meta property="og:image" content="https://nexustech.vn/og-image.jpg">
+  <title>NexusTech - Giải Pháp Tương Lai</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #F4F7F6;
+      color: #212121;
+      line-height: 1.6;
+    }
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+    header, footer, main {
+      width: 100%;
+      margin: 0 auto;
+      max-width: 1280px;
+      padding: 16px;
+    }
+    header {
+      background-color: #F4F7F6;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 64px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .logo {
+      font-family: 'Roboto Slab', serif;
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    nav a {
+      margin: 0 10px;
+      color: #212121;
+    }
+    .cta {
+      background-color: #FF6B6B;
+      padding: 10px 20px;
+      border-radius: 8px;
+      color: #fff;
+      transition: background-color 300ms ease-in-out;
+    }
+    .cta:hover {
+      background-color: #ff5656;
+    }
+    .hamburger {
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    .hero {
+      text-align: center;
+      padding: 100px 16px;
+      background: linear-gradient(135deg, #0A74DA, #FF6B6B);
+      color: #fff;
+    }
+    .hero h1 {
+      font-family: 'Roboto Slab', serif;
+      font-size: 3rem;
+    }
+    .hero p {
+      max-width: 600px;
+      margin: 0 auto;
+      font-size: 1.25rem;
+    }
+    .hero .buttons {
+      margin-top: 20px;
+    }
+    .hero button {
+      font-size: 1rem;
+      margin: 10px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: transform 300ms ease-in-out;
+    }
+    .hero .primary {
+      background-color: #FF6B6B;
+      color: #fff;
+    }
+    .hero .primary:hover {
+      transform: translateY(-5px);
+      background-color: #ff5656;
+    }
+    .hero .secondary {
+      background-color: #fff;
+      color: #0A74DA;
+    }
+    .hero .secondary:hover {
+      transform: translateY(-5px);
+    }
+    .stats {
+      margin-top: 40px;
+    }
+    .stats div {
+      display: inline-block;
+      margin: 0 20px;
+      font-size: 1rem;
+    }
+    .features {
+      background-color: #F4F7F6;
+      padding: 80px 16px;
+    }
+    .features h2 {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 40px;
+      font-family: 'Roboto Slab', serif;
+    }
+    .feature-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 16px;
+      margin: 0 auto;
+      max-width: 1200px;
+    }
+    .feature-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: transform 300ms ease-in-out;
+    }
+    .feature-card:hover {
+      transform: translateY(-5px);
+    }
+    .feature-card h3 {
+      margin-top: 10px;
+      font-size: 1.5rem;
+    }
+    .feature-card p {
+      margin: 10px 0;
+    }
+    .about {
+      background-color: #fff;
+      padding: 80px 16px;
+    }
+    .about h2 {
+      text-align: center;
+      font-size: 2rem;
+      font-family: 'Roboto Slab', serif;
+      margin-bottom: 40px;
+    }
+    .about p {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .testimonials {
+      background-color: #F4F7F6;
+      padding: 80px 16px;
+    }
+    .testimonials h2 {
+      text-align: center;
+      font-size: 2rem;
+      font-family: 'Roboto Slab', serif;
+      margin-bottom: 40px;
+    }
+    .testimonial-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      margin: 0 auto;
+      max-width: 1200px;
+    }
+    .testimonial-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: transform 300ms ease-in-out;
+    }
+    .testimonial-card:hover {
+      transform: translateY(-5px);
+    }
+    .testimonial-card p {
+      margin-bottom: 10px;
+    }
+    .contact {
+      background-color: #fff;
+      padding: 80px 16px;
+    }
+    .contact h2 {
+      text-align: center;
+      font-size: 2rem;
+      font-family: 'Roboto Slab', serif;
+      margin-bottom: 40px;
+    }
+    .contact-form, .contact-info {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .contact-form input, .contact-form textarea {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+    .contact-form button {
+      margin-top: 20px;
+      background-color: #0A74DA;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 300ms ease-in-out;
+    }
+    .contact-form button:hover {
+      background-color: #075bbd;
+    }
+    .contact-info {
+      text-align: center;
+      margin-top: 40px;
+    }
+    footer {
+      background-color: #0A74DA;
+      color: #ffffff;
+      padding: 48px 16px;
+    }
+    footer .footer-columns {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 16px;
+      margin: 0 auto;
+      max-width: 1200px;
+    }
+    footer .social-links a {
+      color: #ffffff;
+      margin-right: 10px;
+      font-size: 1.5rem;
+      transition: transform 300ms ease-in-out;
+    }
+    footer .social-links a:hover {
+      transform: scale(1.1);
+    }
+    footer .newsletter {
+      margin-top: 20px;
+    }
+    footer .newsletter input {
+      width: calc(100% - 50px);
+      padding: 8px;
+      border-radius: 20px;
+      border: none;
+    }
+    footer .newsletter button {
+      background-color: #FF6B6B;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 20px;
+      border: none;
+      cursor: pointer;
+      transition: background-color 300ms ease-in-out;
+    }
+    footer .newsletter button:hover {
+      background-color: #ff5656;
+    }
+    footer .bottom-bar {
+      text-align: center;
+      margin-top: 20px;
+      border-top: 1px solid #ddd;
+      padding-top: 10px;
+    }
+    @media screen and (max-width: 768px) {
+      .feature-cards, .testimonial-cards, .footer-columns {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">🚀 NexusTech Solutions</div>
+    <nav class="desktop-nav">
+      <a href="#hero">Trang chủ</a>
+      <a href="#features">Dịch vụ</a>
+      <a href="#about">Về chúng tôi</a>
+      <a href="#" class="cta">Liên hệ</a>
+    </nav>
+    <div class="hamburger">☰</div>
+  </header>
+
+  <main>
+    <section id="hero" class="hero">
+      <h1>Đổi Mới. Chuyển Đổi. Thành Công.</h1>
+      <p>Chúng tôi là đối tác của bạn trong các dịch vụ AI và Đám mây thế hệ mới, biến những thách thức công nghệ thành lợi thế cạnh tranh cho doanh nghiệp của bạn.</p>
+      <div class="buttons">
+        <button class="primary">Khám phá dịch vụ</button>
+        <button class="secondary">Xem thêm →</button>
+      </div>
+      <div class="stats">
+        <div>500+ Clients</div>|
+        <div>10+ Years</div>|
+        <div>24/7 Support</div>
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <h2>Dịch vụ của chúng tôi</h2>
+      <div class="feature-cards">
+        <div class="feature-card">
+          <h3>🤖 Giải pháp AI</h3>
+          <p>Chúng tôi cung cấp các giải pháp AI thông minh, giúp doanh nghiệp bạn tối ưu hóa quy trình kinh doanh và quản lý dữ liệu.</p>
+          <a href="#">Learn More →</a>
+        </div>
+        <div class="feature-card">
+          <h3>☁️ Cloud Hosting</h3>
+          <p>Dịch vụ lưu trữ trên nền tảng đám mây với khả năng mở rộng và bảo mật tối ưu, đáp ứng mọi nhu cầu của doanh nghiệp.</p>
+          <a href="#">Learn More →</a>
+        </div>
+        <div class="feature-card">
+          <h3>🔒 Bảo mật mạng</h3>
+          <p>Chúng tôi cung cấp các giải pháp bảo mật hiệu quả, bảo vệ dữ liệu và hệ thống của bạn khỏi các mối đe dọa.</p>
+          <a href="#">Learn More →</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" class="about">
+      <h2>Về chúng tôi</h2>
+      <p>Thành lập vào năm 2020, NexusTech Solutions đã nhanh chóng trở thành một trong những công ty công nghệ hàng đầu, cung cấp các giải pháp sáng tạo và hiệu quả trong lĩnh vực AI và điện toán đám mây. Chúng tôi tự hào có đội ngũ 50+ chuyên gia không ngừng sáng tạo để mang lại giá trị tốt nhất cho khách hàng của mình. Hiện tại, chúng tôi đã và đang phục vụ khách hàng trên hơn 30 quốc gia, đem lại những lợi ích thiết thực và hiệu quả cho doanh nghiệp trên toàn thế giới.</p>
+    </section>
+
+    <section id="testimonials" class="testimonials">
+      <h2>Khách hàng nói gì về chúng tôi</h2>
+      <div class="testimonial-cards">
+        <div class="testimonial-card">
+          <p>“NexusTech Solutions đã mang lại một sự thay đổi lớn cho công ty chúng tôi với các giải pháp Cloud Hosting.”</p>
+          <span>— Nguyễn Văn A, Công ty XYZ</span>
+          <div>⭐⭐⭐⭐⭐</div>
+        </div>
+        <div class="testimonial-card">
+          <p>“Đội ngũ NexusTech rất chuyên nghiệp và tận tâm, tôi hoàn toàn hài lòng với dịch vụ của họ.”</p>
+          <span>— Trần Thị B, Tập đoàn ABC</span>
+          <div>⭐⭐⭐⭐⭐</div>
+        </div>
+        <div class="testimonial-card">
+          <p>“Các giải pháp AI của NexusTech giúp chúng tôi tự động hóa nhiều quy trình phức tạp mà trước đây khó có thể thực hiện được.”</p>
+          <span>— Lê Minh C, Công ty DEF</span>
+          <div>⭐⭐⭐⭐⭐</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="contact">
+      <h2>Liên Hệ</h2>
+      <form class="contact-form">
+        <input type="text" placeholder="Họ tên" required>
+        <input type="email" placeholder="Email" required>
+        <input type="tel" placeholder="Số điện thoại">
+        <textarea placeholder="Lời nhắn" required></textarea>
+        <button type="submit">Gửi</button>
+      </form>
+      <div class="contact-info">
+        <p>📧 Email: contact@nexustech.vn</p>
+        <p>📞 Số điện thoại: +1 (555) 123-4567</p>
+        <p>📍 Địa chỉ: 123 Business St, City, Country</p>
+        <p>🕐 Thời gian làm việc: T2-T6 9AM-6PM</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-columns">
+      <div>
+        <h3>🚀 NexusTech Solutions</h3>
+        <p>Đột phá với giải pháp công nghệ tiên tiến.</p>
+      </div>
+      <div>
+        <h4>Dịch vụ</h4>
+        <ul>
+          <li><a href="#">Dịch vụ AI</a></li>
+          <li><a href="#">Cloud Hosting</a></li>
+          <li><a href="#">Bảo mật mạng</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Thông tin</h4>
+        <ul>
+          <li><a href="#about">Về chúng tôi</a></li>
+          <li><a href="#">Tuyển dụng</a></li>
+          <li><a href="#">Chính sách bảo mật</a></li>
+          <li><a href="#">Điều khoản dịch vụ</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="social-links">
+          <a href="https://facebook.com">Facebook</a>
+          <a href="https://twitter.com">Twitter</a>
+          <a href="https://linkedin.com">LinkedIn</a>
+          <a href="https://github.com">GitHub</a>
+        </div>
+        <div class="newsletter">
+          <input type="email" placeholder="Địa chỉ Email">
+          <button>Đăng ký</button>
+        </div>
+      </div>
+    </div>
+    <div class="bottom-bar">
+      © 2025 NexusTech Solutions. All rights reserved.
+    </div>
+  </footer>
+</body>
+</html>
