@@ -1,0 +1,6 @@
+redis sẽ biến thành tool dung cho short term memory
+gửi doc, nhận diện -> ingest
+tiếng vt
+mock data
+sửa  chainlit
+hardcode

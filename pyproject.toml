@@ -1,14 +1,33 @@
 [project]
-name = "hcmut-nqpn"
+name = "Seal-hackathon"
 version = "0.1.0"
-requires-python = ">=3.10,<3.13"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
 dependencies = [
-    "neo4j>=6.0.2",
     "openai>=2.6.1",
     "openai-agents>=0.4.2",
-    "pydantic>=2.12.3",
-    "pymilvus>=2.6.3",
+    "neo4j>=5.0.0",
+    "pydantic>=2.0.0",
+    "pymilvus>=2.3.0",
+    "pymongo>=4.6.0",
+    "pytest>=8.4.2",
+    "sentence-transformers>=3.0.0",
+    "chainlit>=1.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "black>=24.2.0",
+    "mypy>=1.8.0",
+    "flake8>=7.0.0",
+    "promptfoo",
+]
 
+[tool.setuptools]
+package-dir = {"" = "src"}
 
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["src*","agents*", "api*", "core*", "db*", "data_pipeline*", "faq*", "rag*", "utils*"]
