@@ -230,20 +230,21 @@ def _get_routing_client() -> OpenAI:
 
 def classify_user_intent_with_llm(user_input: str) -> str:
     """
-    Use LLM to analyze user input and classify it into one of three flows:
+    Use LLM to analyze user input and classify it into one of four flows:
     - "ingestion": User wants to ingest/upload/process documents
     - "business_analysis": User wants to analyze requirements, detect conflicts, or get improvements
+    - "web_generation": User wants to create/generate a website or web application
     - "rag": Normal query/question (default)
     
     Args:
         user_input: User's input text or query
         
     Returns:
-        "ingestion", "business_analysis", or "rag"
+        "ingestion", "business_analysis", "web_generation", or "rag"
     """
     client = _get_routing_client()
     
-    classification_prompt = f"""Analyze the following user input and classify it into ONE of these three categories based on the user's INTENT and MEANING (not just keywords):
+    classification_prompt = f"""Analyze the following user input and classify it into ONE of these four categories based on the user's INTENT and MEANING (not just keywords):
 
 1. **ingestion**: User wants to:
    - Ingest, upload, or process documents
@@ -258,7 +259,13 @@ def classify_user_intent_with_llm(user_input: str) -> str:
    - Compare multiple requirements/user stories
    - Detect issues in requirements
 
-3. **rag**: User wants to:
+3. **web_generation**: User wants to:
+   - Create, generate, or build a website or web application
+   - Make a website, build a site, create a web app
+   - Generate HTML/CSS/JS code
+   - Design or develop a website
+
+4. **rag**: User wants to:
    - Ask questions or queries
    - Retrieve information
    - Get information about projects, requirements, or user stories
@@ -266,7 +273,7 @@ def classify_user_intent_with_llm(user_input: str) -> str:
 
 User Input: "{user_input}"
 
-Respond with ONLY the category name (one of: "ingestion", "business_analysis", or "rag").
+Respond with ONLY the category name (one of: "ingestion", "business_analysis", "web_generation", or "rag").
 Be decisive and analyze the semantic meaning, not just keywords."""
 
     try:
@@ -283,7 +290,7 @@ Be decisive and analyze the semantic meaning, not just keywords."""
         classification = response.choices[0].message.content.strip().lower()
         
         # Validate and normalize response
-        valid_flows = ["ingestion", "business_analysis", "rag"]
+        valid_flows = ["ingestion", "business_analysis", "web_generation", "rag"]
         if classification not in valid_flows:
             logger.warning(f"LLM returned invalid classification '{classification}', defaulting to 'rag'")
             return "rag"
@@ -384,6 +391,15 @@ def route_request(user_input: str, orchestrator: Optional[Agent] = None) -> Dict
                 "agent": "IngestAgent",
                 "error": str(e)
             }
+    
+    elif flow == "web_generation":
+        # Route to Web Generation Flow
+        logger.info(f"Routing to Web Generation Flow")
+        return {
+            "flow": "web_generation",
+            "output": user_input,  # Pass user input to app.py for processing
+            "agent": "WebGeneratorAgent"
+        }
     
     else:  # flow == "rag" (default)
         # Default to RAG Agent (for normal queries)
