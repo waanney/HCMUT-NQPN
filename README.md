@@ -1,4 +1,5 @@
 # sAInapse Multi-Agent RAG Platform
+<img width="1108" height="827" alt="image" src="https://github.com/user-attachments/assets/5175217f-878e-4732-989a-c7ef6fba45cd" />
 
 A collaborative workspace for business analysts and solution engineers to ingest documents, detect requirement conflicts, and generate implementation artifacts. The platform chains multiple specialized agents (Ingest, BA, Suggestion, RAG, CodeGen, Formatter, Guardrail…) so that Retrieval-Augmented Generation and knowledge-graph reasoning stay aligned throughout the delivery cycle.
 
